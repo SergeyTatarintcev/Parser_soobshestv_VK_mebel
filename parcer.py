@@ -1,5 +1,6 @@
 import time
 import re
+import os
 from collections import Counter
 import pandas as pd
 import pymorphy3
@@ -7,24 +8,13 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
+from dotenv import load_dotenv
 
-# список сообществ
-groups = [
-    "orsahomes",
-    "kuhni_aneva",
-    "adamandpro",
-    "spb.kyxni_na_zakaz",
-    "lavella_kitchen",
-    "olivfabrika",
-    "kupe_piter",
-    "novakuhni1",
-    "mishelkitchen",
-    "kuhnimoi",
-    "itfmebel",
-    "stilkuhni"
-]
+# Загружаем переменные из .env
+load_dotenv()
+groups = os.getenv("VK_GROUPS", "").split(",")
 
-# морфоанализатор для нормализации слов
+# морфоанализатор
 morph = pymorphy3.MorphAnalyzer()
 
 def normalize_word(word):
@@ -37,31 +27,34 @@ def extract_phrases(text, n=2):
     words = [normalize_word(w) for w in words if w not in stop and len(w) > 2]
     return [" ".join(words[i:i+n]) for i in range(len(words)-n+1)]
 
-# Настраиваем Selenium (автоустановка драйвера)
+# Selenium
 options = webdriver.ChromeOptions()
-options.add_argument("--headless")  # без открытия окна браузера
+options.add_argument("--headless")
 options.add_argument("--disable-blink-features=AutomationControlled")
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
 all_phrases = Counter()
 
 for g in groups:
+    g = g.strip()
+    if not g:
+        continue
+
     try:
         url = f"https://vk.com/{g}"
         driver.get(url)
-        time.sleep(3)  # ждём подгрузку контента
+        time.sleep(3)
 
-        # Тексты (название, описание, посты, товары)
         texts = []
 
-        # название сообщества
+        # название
         try:
             title = driver.find_element(By.CLASS_NAME, "page_name").text
             texts.append(title)
         except:
             pass
 
-        # описание сообщества
+        # описание
         try:
             desc = driver.find_element(By.CLASS_NAME, "page_description").text
             texts.append(desc)
@@ -70,17 +63,16 @@ for g in groups:
 
         # посты
         posts = driver.find_elements(By.CLASS_NAME, "wall_post_text")
-        for p in posts[:30]:  # первые 30 постов
+        for p in posts[:30]:
             texts.append(p.text)
 
         # товары
         goods = driver.find_elements(By.CLASS_NAME, "market_row")
-        for g in goods:
-            texts.append(g.text)
+        for item in goods:
+            texts.append(item.text)
 
         full_text = " ".join(texts)
 
-        # извлекаем биграммы и триграммы
         for n in [2,3]:
             all_phrases.update(extract_phrases(full_text, n))
 
