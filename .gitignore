@@ -2,10 +2,10 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
+Lists 640.xlsx
 # C extensions
 *.so
-
+Список 640.xlsx
 # Distribution / packaging
 .Python
 build/
@@ -31,7 +31,12 @@ MANIFEST
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
-
+# Парсинг файлы
+*.csv
+*.xlsx
+vk_groups_list*.py
+vk_keywords*.csv
+vk_selenium_dump.html
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt

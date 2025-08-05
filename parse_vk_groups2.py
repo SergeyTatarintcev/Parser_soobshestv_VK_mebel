@@ -1,33 +1,39 @@
-import time
-import re
 import os
-from collections import Counter
+import re
+import time
 import pandas as pd
-import pymorphy3
+from collections import Counter
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from dotenv import load_dotenv
+import pymorphy3
 
-# Загружаем переменные из .env
+# Загружаем переменные окружения
 load_dotenv()
-groups = os.getenv("VK_GROUPS", "").split(",")
+groups_file = os.getenv("VK_GROUPS_FILE", "Lists 640.xlsx")
 
-# морфоанализатор
+# Читаем список сообществ из Excel (столбец А)
+df_groups = pd.read_excel(groups_file)
+groups = df_groups.iloc[:, 0].dropna().astype(str).tolist()
+
+print(f"📂 Загружено {len(groups)} сообществ из '{groups_file}'")
+
+# Морфоанализатор для нормализации слов
 morph = pymorphy3.MorphAnalyzer()
 
-def normalize_word(word):
+def normalize_word(word: str) -> str:
     return morph.parse(word)[0].normal_form
 
-def extract_phrases(text, n=2):
-    """Извлекаем биграммы/триграммы"""
+def extract_phrases(text: str, n: int = 2):
+    """Извлекаем биграммы и триграммы"""
     words = re.findall(r"[а-яa-zё]+", text.lower())
     stop = {"и","в","на","с","по","а","но","или","как","к","что","это","от","для","из","под","при","над","у","же","бы","то"}
     words = [normalize_word(w) for w in words if w not in stop and len(w) > 2]
     return [" ".join(words[i:i+n]) for i in range(len(words)-n+1)]
 
-# Selenium
+# Настройка Selenium
 options = webdriver.ChromeOptions()
 options.add_argument("--headless")
 options.add_argument("--disable-blink-features=AutomationControlled")
@@ -43,50 +49,51 @@ for g in groups:
     try:
         url = f"https://vk.com/{g}"
         driver.get(url)
-        time.sleep(3)
+        time.sleep(2)
 
         texts = []
 
-        # название
+        # Название
         try:
             title = driver.find_element(By.CLASS_NAME, "page_name").text
             texts.append(title)
         except:
             pass
 
-        # описание
+        # Описание
         try:
             desc = driver.find_element(By.CLASS_NAME, "page_description").text
             texts.append(desc)
         except:
             pass
 
-        # посты
+        # Посты
         posts = driver.find_elements(By.CLASS_NAME, "wall_post_text")
-        for p in posts[:30]:
+        for p in posts[:20]:  # берём первые 20 постов
             texts.append(p.text)
 
-        # товары
+        # Товары
         goods = driver.find_elements(By.CLASS_NAME, "market_row")
-        for item in goods:
+        for item in goods[:10]:  # берём первые 10 товаров
             texts.append(item.text)
 
         full_text = " ".join(texts)
 
-        for n in [2,3]:
+        # Считаем биграммы и триграммы
+        for n in [2, 3]:
             all_phrases.update(extract_phrases(full_text, n))
 
-        print(f"✅ Собрано: {g}")
+        print(f"✅ Обработано сообщество: {g}")
 
     except Exception as e:
-        print(f"Ошибка с {g}: {e}")
+        print(f"⚠️ Ошибка с {g}: {e}")
 
 driver.quit()
 
-# сохраняем в CSV
-df = pd.DataFrame(all_phrases.most_common(300), columns=["Фраза", "Частота"])
-df.to_csv("vk_keywords.csv", index=False, encoding="utf-8-sig")
+# Сохраняем ТОП-500 ключевых фраз
+df = pd.DataFrame(all_phrases.most_common(500), columns=["Фраза", "Частота"])
+df.to_csv("vk_keywords_from_groups.csv", index=False, encoding="utf-8-sig")
 
-print("\nТОП-50 фраз:")
-for phrase, count in all_phrases.most_common(50):
+print("\n🔥 ТОП-30 ключевых фраз:")
+for phrase, count in all_phrases.most_common(30):
     print(f"{phrase} — {count}")
