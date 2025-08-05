@@ -69,3 +69,7 @@ python parser.py
 - python-dotenv
 
 Устанавливаются автоматически через `requirements.txt`.
+
+## 👨‍💻 Автор
+
+Сделано [SergeyTatarintcev](https://github.com/SergeyTatarintcev)
